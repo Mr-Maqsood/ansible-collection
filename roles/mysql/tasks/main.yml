@@ -1,0 +1,59 @@
+---
+- name: Ensure Docker is installed
+  ansible.builtin.yum:
+    name: docker
+    state: present
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Pull MySQL Docker image
+  community.docker.docker_image:
+    name: mysql
+    tag: "8.1"
+    source: pull
+
+- name: Run MySQL container
+  community.docker.docker_container:
+    name: myapp-mysql
+    image: mysql:8.1
+    state: started
+    restart_policy: always
+    env:
+      MYSQL_ROOT_PASSWORD: "{{ vault_mysql_root_pass }}"
+      MYSQL_DATABASE: myappdb
+      MYSQL_USER: "{{ vault_mysql_user }}"
+      MYSQL_PASSWORD: "{{ vault_mysql_password }}"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+- name: Wait for MySQL to be ready
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 3306
+    delay: 5
+    timeout: 60
+
+# Optional: create additional database
+- name: Create additional database
+  community.docker.docker_container_exec:
+    container: myapp-mysql
+    command: >
+      mysql -uroot -p{{ vault_mysql_root_pass }} -e
+      "CREATE DATABASE IF NOT EXISTS myappdb_extra;"
+
+# Optional: create database user
+- name: Create DB user
+  community.docker.docker_container_exec:
+    container: myapp-mysql
+    command: >
+      mysql -uroot -p{{ vault_mysql_root_pass }} -e
+      "CREATE USER IF NOT EXISTS '{{ vault_mysql_user }}'@'%' IDENTIFIED BY '{{ vault_mysql_password }}';
+       GRANT ALL PRIVILEGES ON myappdb.* TO '{{ vault_mysql_user }}'@'%';
+       FLUSH PRIVILEGES;"
+
