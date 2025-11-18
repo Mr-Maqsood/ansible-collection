@@ -19,7 +19,7 @@ pipeline {
                 // Use Jenkins credentials: Vault password + uploaded PEM key
                 withCredentials([
                     string(credentialsId: 'ansible-vault-pass', variable: 'ANSIBLE_VAULT_PASS'),
-                    file(credentialsId: 'aws-pem-key', variable: 'docker.pem')
+                    file(credentialsId: 'ansible-vault-pass', variable: 'docker.pem')
                 ]) {
                     sh '''
                         # Create temporary file for Vault password
