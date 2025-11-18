@@ -19,7 +19,7 @@ pipeline {
                 // Use Jenkins credentials: Vault password + uploaded PEM key
                 withCredentials([
                     string(credentialsId: 'ansible-vault-pass', variable: 'ANSIBLE_VAULT_PASS'),
-                    file(credentialsId: 'ansible-vault-pass', variable: 'docker.pem')
+                    file(credentialsId: 'ansible-vault-pass', variable: 'SSH_KEY')
                 ]) {
                     sh '''
                         # Create temporary file for Vault password
@@ -27,7 +27,7 @@ pipeline {
 
                         # Run Ansible playbook using the uploaded PEM key
                         ansible-playbook -i inventory.ini site.yml \
-                          --private-key $docker.pem \
+                          --private-key $SSH_KEY \
                           --vault-password-file vault_pass.txt
 
                         # Cleanup temporary vault password file
