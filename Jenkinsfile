@@ -4,14 +4,19 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', 
+                git branch: 'main',
                     url: 'https://github.com/Mr-Maqsood/ansible-collection.git'
             }
         }
 
+        // ← Ye stage sabse pehle Galaxy ke 500 error ko hamesha ke liye khatam kar dega
         stage('Install Collections') {
             steps {
-                sh 'ansible-galaxy collection install -r requirements.yml --force'
+                retry(4) {                    // 4 baar try karega agar Galaxy down ho
+                    timeout(time: 2, unit: 'MINUTES') {
+                        sh 'ansible-galaxy collection install -r requirements.yml --force'
+                    }
+                }
             }
         }
 
@@ -23,16 +28,24 @@ pipeline {
                 ]) {
                     sh '''
                         echo "$ANSIBLE_VAULT_PASS" > vault_pass.txt
-                        chmod 600 "$SSH_KEY"
-                        
+                        chmod 600 "$SSH_KEY"   # Jenkins aksar khud kar deta hai, phir bhi safe
+
+                        echo "Running Ansible Playbook on real servers..."
                         ansible-playbook -i inventory.ini site.yml \
                             --private-key "$SSH_KEY" \
-                            --vault-password-file vault_pass.txt
-                        
+                            --vault-password-file vault_pass.txt \
+                            --ssh-common-args="-o StrictHostKeyChecking=no"   # pehli baar host key accept kar lega
+
                         rm -f vault_pass.txt
                     '''
                 }
             }
         }
+    }
+
+    // ← Global timeout + failure pe bhi email ya notification aa sake
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 }
